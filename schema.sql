@@ -72,7 +72,7 @@ CREATE TABLE Ship (
     ship_name VARCHAR(100) NOT NULL,
     length DECIMAL(6, 2) NOT NULL CHECK (length > 0),
     width DECIMAL(5, 2) NOT NULL CHECK (width > 0),
-    berth_code INT NOT NULL UNIQUE, -- Unique enforces 1:1 (one ship per berth)
+    berth_code INT NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED, -- Unique enforces 1:1 (one ship per berth)
     PRIMARY KEY (mmsi),
     FOREIGN KEY (berth_code) 
         REFERENCES Berth(berth_code)
@@ -139,7 +139,7 @@ CREATE TABLE Position (
 --------------------------------------------------------------------------------
 CREATE TABLE Container (
     iso_code CHAR(11),
-    content TEXT,
+    description TEXT,
     company_code CHAR(3) NOT NULL,
     -- Location option A: Stored in a Yard Slot
     yard_code VARCHAR(20),
