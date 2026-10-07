@@ -18,7 +18,6 @@ CREATE TABLE City (
     FOREIGN KEY (country_name) 
         REFERENCES Country(country_name)
         ON UPDATE CASCADE 
-        ON DELETE RESTRICT
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (City -> Country):
 -- ON UPDATE CASCADE: If a country's name changes, propagate to city records.
@@ -40,7 +39,6 @@ CREATE TABLE Company (
     FOREIGN KEY (city_name, country_name) 
         REFERENCES City(city_name, country_name)
         ON UPDATE CASCADE 
-        ON DELETE RESTRICT
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Company -> City):
 -- ON UPDATE CASCADE: If city/country details change, update company references.
@@ -53,8 +51,8 @@ CREATE TABLE Company (
 --------------------------------------------------------------------------------
 CREATE TABLE Berth (
     berth_code INT,
-    latitude DECIMAL(7, 5) NOT NULL,
-    longitude DECIMAL(8, 5) NOT NULL,
+    latitude NUMERIC NOT NULL CHECK (latitude = ROUND(latitude, 5)),
+    longitude NUMERIC NOT NULL CHECK (longitude = ROUND(longitude, 5)),
     PRIMARY KEY (berth_code),
     CHECK (latitude BETWEEN -90.00000 AND 90.00000),
     CHECK (longitude BETWEEN -180.00000 AND 180.00000)
@@ -70,14 +68,13 @@ CREATE TABLE Ship (
     imo INT NOT NULL UNIQUE,
     call_sign VARCHAR(10) NOT NULL UNIQUE,
     ship_name VARCHAR(100) NOT NULL,
-    length DECIMAL(6, 2) NOT NULL CHECK (length > 0),
-    width DECIMAL(5, 2) NOT NULL CHECK (width > 0),
+    length NUMERIC NOT NULL CHECK (length > 0 AND length = ROUND(length, 2)),
+    width NUMERIC NOT NULL CHECK (width > 0 AND width = ROUND(width, 2)),
     berth_code INT NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED, -- Unique enforces 1:1 (one ship per berth)
     PRIMARY KEY (mmsi),
     FOREIGN KEY (berth_code) 
         REFERENCES Berth(berth_code)
         ON UPDATE CASCADE 
-        ON DELETE RESTRICT 
         DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR DEFERRABLE CONSTRAINT:
@@ -110,7 +107,6 @@ CREATE TABLE Yard (
     FOREIGN KEY (type_name) 
         REFERENCES YardType(type_name)
         ON UPDATE CASCADE 
-        ON DELETE RESTRICT
 );
 
 --------------------------------------------------------------------------------
@@ -152,19 +148,17 @@ CREATE TABLE Container (
     PRIMARY KEY (iso_code),
     
     -- Constraint: First 3 characters of ISO 6346 code must match company prefix
-    CHECK (SUBSTRING(iso_code FROM 1 FOR 3) = company_code),
+    CHECK (iso_code LIKE company_code || '%'),
     
     -- Foreign Key: Ownership
     FOREIGN KEY (company_code) 
         REFERENCES Company(company_code)
-        ON UPDATE CASCADE 
-        ON DELETE RESTRICT,
-        
+        ON UPDATE CASCADE,
+
     -- Foreign Key: Yard Location (Unique constraint ensures 1 container per slot)
     FOREIGN KEY (yard_code, bay, row, tier) 
         REFERENCES Position(yard_code, bay, row, tier)
-        ON UPDATE CASCADE 
-        ON DELETE SET NULL,
+        ON UPDATE CASCADE,
     UNIQUE (yard_code, bay, row, tier),
     
     -- Foreign Key: Ship Location
