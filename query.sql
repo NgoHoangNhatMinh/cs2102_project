@@ -91,7 +91,7 @@ VALUES ('ADIU7583471', 'Cargo Container 3', 'ADI', 'Y', 0, 0, 2);
 --------------------------------------------------------------------------------
 SELECT 
     ys.yard_code,
-    y.type,
+    y.type AS yard_type,
     ys.bay_number,
     ys.row_number,
     ys.tier_number
