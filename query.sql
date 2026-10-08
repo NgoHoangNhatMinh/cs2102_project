@@ -1,14 +1,14 @@
 --------------------------------------------------------------------------------
--- Operation 1: Create yard type "Simple" (max_tiers=3), yard "Y", 
+-- Operation 1: Create yard type "Simple" (max_tier_number=3), yard "Y", 
 -- and 12 slots across 2 bays (0, 1) and 2 rows (0, 1) with tiers 1..3.
 --------------------------------------------------------------------------------
-INSERT INTO YardType (type_name, max_tiers) 
+INSERT INTO YardType (type, max_tier_number) 
 VALUES ('Simple', 3);
 
-INSERT INTO Yard (yard_code, type_name) 
+INSERT INTO Yard (yard_code, type) 
 VALUES ('Y', 'Simple');
 
-INSERT INTO Position (yard_code, bay, row, tier) VALUES
+INSERT INTO Position (yard_code, bay_number, row_number, tier_number) VALUES
 ('Y', 0, 0, 1), ('Y', 0, 0, 2), ('Y', 0, 0, 3),
 ('Y', 0, 1, 1), ('Y', 0, 1, 2), ('Y', 0, 1, 3),
 ('Y', 1, 0, 1), ('Y', 1, 0, 2), ('Y', 1, 0, 3),
@@ -39,7 +39,7 @@ VALUES ('ADI', 'Apasaja Distribution International', '1 HarbourFront Ave', '0986
 INSERT INTO Ship (mmsi, imo, call_sign, ship_name, length, width, berth_code) 
 VALUES (211382280, 9229843, '5LJY5', 'Vessel A', 150.00, 25.00, 1);
 
-INSERT INTO Container (iso_code, description, company_code, mmsi) 
+INSERT INTO Container (ISO6346, description, company_code, mmsi) 
 VALUES ('ADIU4974982', 'Cargo Container 1', 'ADI', 211382280);
 
 --------------------------------------------------------------------------------
@@ -48,14 +48,14 @@ VALUES ('ADIU4974982', 'Cargo Container 1', 'ADI', 211382280);
 INSERT INTO Ship (mmsi, imo, call_sign, ship_name, length, width, berth_code) 
 VALUES (209912000, 9261889, '5BLP5', 'Vessel B', 180.00, 28.00, 2);
 
-INSERT INTO Container (iso_code, description, company_code, mmsi) 
+INSERT INTO Container (ISO6346, description, company_code, mmsi) 
 VALUES ('ADIU7385836', 'Cargo Container 2', 'ADI', 209912000);
 
 --------------------------------------------------------------------------------
 -- Operation 6: Move container ADIU4974982 to yard Y at bay 0, row 0, tier 1
 --------------------------------------------------------------------------------
-DELETE FROM Container WHERE iso_code = 'ADIU4974982';
-INSERT INTO Container (iso_code, description, company_code, yard_code, bay, row, tier) 
+DELETE FROM Container WHERE ISO6346 = 'ADIU4974982';
+INSERT INTO Container (ISO6346, description, company_code, yard_code, bay_number, row_number, tier_number) 
 VALUES ('ADIU4974982', 'Cargo Container 1', 'ADI', 'Y', 0, 0, 1);
 
 --------------------------------------------------------------------------------
@@ -69,21 +69,21 @@ DELETE FROM Ship WHERE mmsi = 211382280;
 INSERT INTO Ship (mmsi, imo, call_sign, ship_name, length, width, berth_code) 
 VALUES (255806008, 9277400, '3FIV6', 'Vessel C', 200.00, 30.00, 1);
 
-INSERT INTO Container (iso_code, description, company_code, mmsi) 
+INSERT INTO Container (ISO6346, description, company_code, mmsi) 
 VALUES ('ADIU7583471', 'Cargo Container 3', 'ADI', 255806008);
 
 --------------------------------------------------------------------------------
 -- Operation 9: Ship MMSI 209912000 leaves berth
 -- (Container ADIU7385836 leaves with the ship)
 --------------------------------------------------------------------------------
-DELETE FROM Container WHERE iso_code = 'ADIU7385836';
+DELETE FROM Container WHERE ISO6346 = 'ADIU7385836';
 DELETE FROM Ship WHERE mmsi = 209912000;
 
 --------------------------------------------------------------------------------
 -- Operation 10: Move container ADIU7583471 to yard Y at bay 0, row 0, tier 2
 --------------------------------------------------------------------------------
-DELETE FROM Container WHERE iso_code = 'ADIU7583471';
-INSERT INTO Container (iso_code, description, company_code, yard_code, bay, row, tier) 
+DELETE FROM Container WHERE ISO6346 = 'ADIU7583471';
+INSERT INTO Container (ISO6346, description, company_code, yard_code, bay_number, row_number, tier_number) 
 VALUES ('ADIU7583471', 'Cargo Container 3', 'ADI', 'Y', 0, 0, 2);
 
 --------------------------------------------------------------------------------
@@ -91,21 +91,21 @@ VALUES ('ADIU7583471', 'Cargo Container 3', 'ADI', 'Y', 0, 0, 2);
 --------------------------------------------------------------------------------
 SELECT 
     ys.yard_code,
-    y.type_name AS yard_type,
-    ys.bay AS bay_number,
-    ys.row AS row_number,
-    ys.tier AS tier_number
+    y.type,
+    ys.bay_number,
+    ys.row_number,
+    ys.tier_number
 FROM Position ys
 JOIN Yard y 
     ON ys.yard_code = y.yard_code
 LEFT JOIN Container c 
     ON ys.yard_code = c.yard_code 
-   AND ys.bay = c.bay 
-   AND ys.row = c.row 
-   AND ys.tier = c.tier
-WHERE c.iso_code IS NULL
+   AND ys.bay_number = c.bay_number 
+   AND ys.row_number = c.row_number 
+   AND ys.tier_number = c.tier_number
+WHERE c.ISO6346 IS NULL
 ORDER BY 
     ys.yard_code ASC,
-    ys.bay ASC,
-    ys.row ASC,
-    ys.tier ASC;
+    ys.bay_number ASC,
+    ys.row_number ASC,
+    ys.tier_number ASC;

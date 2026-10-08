@@ -21,7 +21,6 @@ CREATE TABLE City (
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (City -> Country):
 -- ON UPDATE CASCADE: If a country's name changes, propagate to city records.
--- ON DELETE RESTRICT: Prevent deletion of a country if cities are linked to it.
 
 --------------------------------------------------------------------------------
 -- 3. Company
@@ -42,7 +41,6 @@ CREATE TABLE Company (
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Company -> City):
 -- ON UPDATE CASCADE: If city/country details change, update company references.
--- ON DELETE RESTRICT: Do not allow deletion of a city if companies are located in it.
 
 --------------------------------------------------------------------------------
 -- 4. Berth
@@ -82,7 +80,6 @@ CREATE TABLE Ship (
 -- ships between berths or registering docked vessels during initialization.
 -- JUSTIFICATION FOR EVENT ACTIONS (Ship -> Berth):
 -- ON UPDATE CASCADE: Berth renumbering automatically updates ship records.
--- ON DELETE RESTRICT: Cannot delete a berth row if a ship is actively docked there.
 
 --------------------------------------------------------------------------------
 -- 6. YardType
@@ -90,9 +87,9 @@ CREATE TABLE Ship (
 -- Recorded even if no yards of this type currently exist.
 --------------------------------------------------------------------------------
 CREATE TABLE YardType (
-    type_name VARCHAR(50),
-    max_tiers INT NOT NULL CHECK (max_tiers > 0),
-    PRIMARY KEY (type_name)
+    type VARCHAR(50),
+    max_tier_number INT NOT NULL CHECK (max_tier_number > 0),
+    PRIMARY KEY (type)
 );
 
 --------------------------------------------------------------------------------
@@ -102,24 +99,24 @@ CREATE TABLE YardType (
 --------------------------------------------------------------------------------
 CREATE TABLE Yard (
     yard_code VARCHAR(20),
-    type_name VARCHAR(50) NOT NULL,
+    type VARCHAR(50) NOT NULL,
     PRIMARY KEY (yard_code),
-    FOREIGN KEY (type_name) 
-        REFERENCES YardType(type_name)
+    FOREIGN KEY (type) 
+        REFERENCES YardType(type)
         ON UPDATE CASCADE 
 );
 
 --------------------------------------------------------------------------------
 -- 8. Position 
 -- Weak entity representing discrete storage locations in a yard.
--- Partial key: (bay, row, tier). Compound Primary Key: (yard_code, bay, row, tier).
+-- Partial key: (bay_number, row_number, tier_number). Compound Primary Key: (yard_code, bay_number, row_number, tier_number).
 --------------------------------------------------------------------------------
 CREATE TABLE Position (
     yard_code VARCHAR(20),
-    bay INT CHECK (bay >= 0),
-    row INT CHECK (row >= 0),
-    tier INT CHECK (tier > 0),
-    PRIMARY KEY (yard_code, bay, row, tier),
+    bay_number INT CHECK (bay_number >= 0),
+    row_number INT CHECK (row_number >= 0),
+    tier_number INT CHECK (tier_number > 0),
+    PRIMARY KEY (yard_code, bay_number, row_number, tier_number),
     FOREIGN KEY (yard_code) 
         REFERENCES Yard(yard_code)
         ON UPDATE CASCADE 
@@ -134,21 +131,21 @@ CREATE TABLE Position (
 -- Must be in a yard slot OR on a ship (Exclusive XOR relationship enforced via CHECK).
 --------------------------------------------------------------------------------
 CREATE TABLE Container (
-    iso_code CHAR(11),
+    ISO6346 CHAR(11),
     description TEXT,
     company_code CHAR(3) NOT NULL,
     -- Location option A: Stored in a Yard Slot
     yard_code VARCHAR(20),
-    bay INT,
-    row INT,
-    tier INT,
+    bay_number INT,
+    row_number INT,
+    tier_number INT,
     -- Location option B: Loaded on a Ship
     mmsi INT,
     
-    PRIMARY KEY (iso_code),
+    PRIMARY KEY (ISO6346),
     
     -- Constraint: First 3 characters of ISO 6346 code must match company prefix
-    CHECK (iso_code LIKE company_code || '%'),
+    CHECK (ISO6346 LIKE company_code || '%'),
     
     -- Foreign Key: Ownership
     FOREIGN KEY (company_code) 
@@ -156,10 +153,10 @@ CREATE TABLE Container (
         ON UPDATE CASCADE,
 
     -- Foreign Key: Yard Location (Unique constraint ensures 1 container per slot)
-    FOREIGN KEY (yard_code, bay, row, tier) 
-        REFERENCES Position(yard_code, bay, row, tier)
+    FOREIGN KEY (yard_code, bay_number, row_number, tier_number) 
+        REFERENCES Position(yard_code, bay_number, row_number, tier_number)
         ON UPDATE CASCADE,
-    UNIQUE (yard_code, bay, row, tier),
+    UNIQUE (yard_code, bay_number, row_number, tier_number),
     
     -- Foreign Key: Ship Location
     FOREIGN KEY (mmsi) 
@@ -169,9 +166,9 @@ CREATE TABLE Container (
         
     -- Exclusive Location (XOR): Container MUST be in a yard slot OR on a ship, NOT both or neither
     CHECK (
-        (yard_code IS NOT NULL AND bay IS NOT NULL AND row IS NOT NULL AND tier IS NOT NULL AND mmsi IS NULL)
+        (yard_code IS NOT NULL AND bay_number IS NOT NULL AND row_number IS NOT NULL AND tier_number IS NOT NULL AND mmsi IS NULL)
         OR
-        (yard_code IS NULL AND bay IS NULL AND row IS NULL AND tier IS NULL AND mmsi IS NOT NULL)
+        (yard_code IS NULL AND bay_number IS NULL AND row_number IS NULL AND tier_number IS NULL AND mmsi IS NOT NULL)
     )
 );
 -- JUSTIFICATION FOR DEVIATION FROM BASIC LECTURE TRANSLATION:
@@ -185,11 +182,11 @@ CREATE TABLE Container (
 --------------------------------------------------------------------------------
 /*
 1. Dynamic Maximum Tier Constraint:
-   The `tier` of a container in `Position` cannot exceed `YardType.max_tiers` for that yard.
+   The `tier_number` of a container in `Position` cannot exceed `YardType.max_tier_number` for that yard.
    - Reason: Standard SQL `CHECK` constraints cannot execute subqueries across tables.
 
 2. Sequential Gravity Stacking Rule:
-   A container cannot occupy tier N (where N > 1) in a (yard_code, bay, row) slot unless 
+   A container cannot occupy tier N (where N > 1) in a (yard_code, bay_number, row_number) slot unless 
    a container already occupies tier N - 1 at the same bay and row.
    - Reason: Requires procedural validation / cross-row state checking.
 
