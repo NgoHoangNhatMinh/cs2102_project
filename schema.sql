@@ -48,7 +48,7 @@ CREATE TABLE Company (
 -- Recorded even if empty.
 --------------------------------------------------------------------------------
 CREATE TABLE Berth (
-    berth_code INT,
+    berth_code INT CHECK (berth_code >= 0),
     latitude NUMERIC NOT NULL CHECK (latitude = ROUND(latitude, 5)),
     longitude NUMERIC NOT NULL CHECK (longitude = ROUND(longitude, 5)),
     PRIMARY KEY (berth_code),
