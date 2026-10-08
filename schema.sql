@@ -21,6 +21,7 @@ CREATE TABLE City (
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (City -> Country):
 -- ON UPDATE CASCADE: If a country's name changes, propagate to city records.
+-- ON DELETE NO ACTION (default): Blocks deleting a country that has cities.
 
 --------------------------------------------------------------------------------
 -- 3. Company
@@ -41,6 +42,7 @@ CREATE TABLE Company (
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Company -> City):
 -- ON UPDATE CASCADE: If city/country details change, update company references.
+-- ON DELETE NO ACTION (default): Blocks deleting a city that has companies.
 
 --------------------------------------------------------------------------------
 -- 4. Berth
@@ -80,6 +82,7 @@ CREATE TABLE Ship (
 -- ships between berths or registering docked vessels during initialization.
 -- JUSTIFICATION FOR EVENT ACTIONS (Ship -> Berth):
 -- ON UPDATE CASCADE: Berth renumbering automatically updates ship records.
+-- ON DELETE NO ACTION (default): Blocks deleting a berth with a docked ship.
 
 --------------------------------------------------------------------------------
 -- 6. YardType
@@ -105,6 +108,9 @@ CREATE TABLE Yard (
         REFERENCES YardType(type)
         ON UPDATE CASCADE 
 );
+-- JUSTIFICATION FOR EVENT ACTIONS (Yard -> YardType):
+-- ON UPDATE CASCADE: Renaming a yard type updates its yards.
+-- ON DELETE NO ACTION (default): Blocks deleting a yard type still in use.
 
 --------------------------------------------------------------------------------
 -- 8. Position 
@@ -123,6 +129,7 @@ CREATE TABLE Position (
         ON DELETE CASCADE
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Position -> Yard):
+-- ON UPDATE CASCADE: Changing a yard code updates its positions.
 -- ON DELETE CASCADE: If a yard is decommissioned/removed, its physical slots are deleted.
 
 --------------------------------------------------------------------------------
@@ -171,6 +178,15 @@ CREATE TABLE Container (
         (yard_code IS NULL AND bay_number IS NULL AND row_number IS NULL AND tier_number IS NULL AND mmsi IS NOT NULL)
     )
 );
+-- JUSTIFICATION FOR EVENT ACTIONS (Container -> Company):
+-- ON UPDATE CASCADE: Changing a company code updates its containers.
+-- ON DELETE NO ACTION (default): Blocks deleting a company that owns containers.
+-- JUSTIFICATION FOR EVENT ACTIONS (Container -> Position):
+-- ON UPDATE CASCADE: A stored container follows changes to its position.
+-- ON DELETE NO ACTION (default): Blocks deleting an occupied position (or its yard).
+-- JUSTIFICATION FOR EVENT ACTIONS (Container -> Ship):
+-- ON UPDATE CASCADE: Changing a ship's MMSI updates the containers on board.
+-- ON DELETE CASCADE: Containers still on board leave the terminal with the ship.
 -- JUSTIFICATION FOR DEVIATION FROM BASIC LECTURE TRANSLATION:
 -- Standard translation of two relationships (Stored_On_Ship and Stored_At_Yard)
 -- into a single entity table usually results in nullable foreign keys.
