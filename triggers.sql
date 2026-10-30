@@ -250,3 +250,29 @@ CREATE CONSTRAINT TRIGGER container_not_both_ship_and_yard
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
     EXECUTE FUNCTION check_container_not_both_ship_and_yard();
+
+-- Trigger 4: A container in a yard is either on the ground or on the top of another container.
+CREATE FUNCTION check_container_not_floating() RETURNS TRIGGER AS $$
+BEGIN
+	IF EXISTS(
+		SELECT 1 FROM container c
+			WHERE c.mmsi IS NULL
+			GROUP BY c.row_number
+			-- Property 1: There must not be any duplicates.
+			HAVING COUNT(*) <> COUNT(DISTINCT c.tier_number)
+			-- Property 2: The maximum tier number must equal to the number of containers in the row.
+			OR COUNT(*) <> MAX(c.tier_number)
+			-- Property 1 and 2 guarantee that the tier number ranges from 1, 2, 3, ..., N.
+    ) THEN
+        RAISE EXCEPTION 'A container in a yard is either on the group or on top of another container; there are no
+		floating containers';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER container_not_floating
+    AFTER INSERT OR UPDATE OR DELETE ON Container
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION check_container_not_floating();
