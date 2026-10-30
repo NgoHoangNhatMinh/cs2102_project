@@ -17,11 +17,13 @@ CREATE TABLE City (
     PRIMARY KEY (city_name, country_name),
     FOREIGN KEY (country_name) 
         REFERENCES Country(country_name)
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (City -> Country):
 -- ON UPDATE CASCADE: If a country's name changes, propagate to city records.
--- ON DELETE NO ACTION (default): Blocks deleting a country that has cities.
+-- ON DELETE CASCADE: Deleting a country removes its cities (City is a weak entity of Country).
 
 --------------------------------------------------------------------------------
 -- 3. Company
@@ -38,11 +40,13 @@ CREATE TABLE Company (
     PRIMARY KEY (company_code),
     FOREIGN KEY (city_name, country_name) 
         REFERENCES City(city_name, country_name)
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Company -> City):
 -- ON UPDATE CASCADE: If city/country details change, update company references.
--- ON DELETE NO ACTION (default): Blocks deleting a city that has companies.
+-- ON DELETE CASCADE: Deleting a city removes its companies (required by project spec: all FKs cascade).
 
 --------------------------------------------------------------------------------
 -- 4. Berth
@@ -51,8 +55,8 @@ CREATE TABLE Company (
 --------------------------------------------------------------------------------
 CREATE TABLE Berth (
     berth_code INT CHECK (berth_code >= 0),
-    latitude NUMERIC NOT NULL CHECK (latitude = ROUND(latitude, 5)),
-    longitude NUMERIC NOT NULL CHECK (longitude = ROUND(longitude, 5)),
+    latitude NUMERIC(7,5) NOT NULL,
+    longitude NUMERIC(8,5) NOT NULL,
     PRIMARY KEY (berth_code),
     CHECK (latitude BETWEEN -90.00000 AND 90.00000),
     CHECK (longitude BETWEEN -180.00000 AND 180.00000)
@@ -65,16 +69,19 @@ CREATE TABLE Berth (
 --------------------------------------------------------------------------------
 CREATE TABLE Ship (
     mmsi INT,
-    imo INT NOT NULL UNIQUE,
-    call_sign VARCHAR(10) NOT NULL UNIQUE,
+    imo INT NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED,
+    call_sign VARCHAR(10) NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED,
     ship_name VARCHAR(100) NOT NULL,
     length NUMERIC NOT NULL CHECK (length > 0 AND length = ROUND(length, 2)),
     width NUMERIC NOT NULL CHECK (width > 0 AND width = ROUND(width, 2)),
     berth_code INT NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED, -- Unique enforces 1:1 (one ship per berth)
     PRIMARY KEY (mmsi),
+    CHECK (mmsi BETWEEN 100000000 AND 999999999), -- MMSI is a 9-digit number
+    CHECK (imo BETWEEN 1000000 AND 9999999),      -- IMO number is a 7-digit number
     FOREIGN KEY (berth_code) 
         REFERENCES Berth(berth_code)
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
         DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR DEFERRABLE CONSTRAINT:
@@ -82,7 +89,7 @@ CREATE TABLE Ship (
 -- ships between berths or registering docked vessels during initialization.
 -- JUSTIFICATION FOR EVENT ACTIONS (Ship -> Berth):
 -- ON UPDATE CASCADE: Berth renumbering automatically updates ship records.
--- ON DELETE NO ACTION (default): Blocks deleting a berth with a docked ship.
+-- ON DELETE CASCADE: Removing a berth removes the ship docked there (every ship must be docked at a berth).
 
 --------------------------------------------------------------------------------
 -- 6. YardType
@@ -106,11 +113,13 @@ CREATE TABLE Yard (
     PRIMARY KEY (yard_code),
     FOREIGN KEY (type) 
         REFERENCES YardType(type)
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Yard -> YardType):
 -- ON UPDATE CASCADE: Renaming a yard type updates its yards.
--- ON DELETE NO ACTION (default): Blocks deleting a yard type still in use.
+-- ON DELETE CASCADE: Removing a yard type removes its yards (every yard must have a type).
 
 --------------------------------------------------------------------------------
 -- 8. Position 
@@ -125,8 +134,9 @@ CREATE TABLE Position (
     PRIMARY KEY (yard_code, bay_number, row_number, tier_number),
     FOREIGN KEY (yard_code) 
         REFERENCES Yard(yard_code)
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
         ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Position -> Yard):
 -- ON UPDATE CASCADE: Changing a yard code updates its positions.
@@ -139,7 +149,7 @@ CREATE TABLE Position (
 --------------------------------------------------------------------------------
 CREATE TABLE Container (
     ISO6346 CHAR(11),
-    description TEXT,
+    description TEXT NOT NULL,
     company_code CHAR(3) NOT NULL,
     -- Location option A: Stored in a Yard Slot
     yard_code VARCHAR(20),
@@ -157,20 +167,25 @@ CREATE TABLE Container (
     -- Foreign Key: Ownership
     FOREIGN KEY (company_code) 
         REFERENCES Company(company_code)
-        ON UPDATE CASCADE,
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED,
 
     -- Foreign Key: Yard Location (Unique constraint ensures 1 container per slot)
     FOREIGN KEY (yard_code, bay_number, row_number, tier_number) 
         REFERENCES Position(yard_code, bay_number, row_number, tier_number)
-        ON UPDATE CASCADE,
-    UNIQUE (yard_code, bay_number, row_number, tier_number),
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED,
+    UNIQUE (yard_code, bay_number, row_number, tier_number) DEFERRABLE INITIALLY DEFERRED,
     
     -- Foreign Key: Ship Location
     FOREIGN KEY (mmsi) 
         REFERENCES Ship(mmsi)
-        ON UPDATE CASCADE 
-        ON DELETE CASCADE,
-        
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+        DEFERRABLE INITIALLY DEFERRED,
+
     -- Exclusive Location (XOR): Container MUST be in a yard slot OR on a ship, NOT both or neither
     CHECK (
         (yard_code IS NOT NULL AND bay_number IS NOT NULL AND row_number IS NOT NULL AND tier_number IS NOT NULL AND mmsi IS NULL)
@@ -180,10 +195,10 @@ CREATE TABLE Container (
 );
 -- JUSTIFICATION FOR EVENT ACTIONS (Container -> Company):
 -- ON UPDATE CASCADE: Changing a company code updates its containers.
--- ON DELETE NO ACTION (default): Blocks deleting a company that owns containers.
+-- ON DELETE CASCADE: Removing a company removes its containers (every container must have an owner).
 -- JUSTIFICATION FOR EVENT ACTIONS (Container -> Position):
 -- ON UPDATE CASCADE: A stored container follows changes to its position.
--- ON DELETE NO ACTION (default): Blocks deleting an occupied position (or its yard).
+-- ON DELETE CASCADE: Removing a position removes the container stored there (the container's location would otherwise be dangling).
 -- JUSTIFICATION FOR EVENT ACTIONS (Container -> Ship):
 -- ON UPDATE CASCADE: Changing a ship's MMSI updates the containers on board.
 -- ON DELETE CASCADE: Containers still on board leave the terminal with the ship.
