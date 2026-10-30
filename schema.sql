@@ -1,3 +1,6 @@
+-- NOTE: This file is the Project 2 schema. For Project 3, do NOT change the schema here.
+-- Make any schema changes in triggers.sql instead (it contains the schema plus the triggers).
+
 --------------------------------------------------------------------------------
 -- 1. Country
 -- Represents countries. Recorded even if no cities/companies exist yet.
