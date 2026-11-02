@@ -273,6 +273,31 @@ CREATE CONSTRAINT TRIGGER container_not_both_ship_and_yard
     FOR EACH ROW
     EXECUTE FUNCTION check_container_not_both_ship_and_yard();
 
+-- Trigger 3: A container in a yard cannot be stacked higher than the maximum tier of that yard.
+CREATE FUNCTION check_container_within_max_tier() RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM Container c
+             JOIN Yard y ON y.yard_code = c.yard_code
+             JOIN YardType yt ON yt.type = y.type
+        WHERE c.yard_code IS NOT NULL
+          AND c.tier_number > yt.max_tier_number
+    ) THEN
+        RAISE EXCEPTION 'A container in a yard cannot be stacked higher than the maximum tier of that yard';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Only INSERT and UPDATE on Container can place a container above the maximum
+-- tier; a DELETE can never introduce a violation, so DELETE is not covered.
+CREATE CONSTRAINT TRIGGER container_within_max_tier
+    AFTER INSERT OR UPDATE ON Container
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION check_container_within_max_tier();
+
 -- Trigger 4: A container in a yard is either on the ground or on the top of another container.
 CREATE FUNCTION check_container_not_floating() RETURNS TRIGGER AS $$
 BEGIN

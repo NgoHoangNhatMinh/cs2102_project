@@ -15,3 +15,5 @@ DROP TABLE IF EXISTS Country CASCADE;
 DROP FUNCTION IF EXISTS is_on_yard(c Container) CASCADE;
 DROP FUNCTION IF EXISTS check_container_not_floating() CASCADE;
 DROP FUNCTION IF EXISTS check_container_not_both_ship_and_yard() CASCADE;
+DROP FUNCTION IF EXISTS check_container_has_location() CASCADE;
+DROP FUNCTION IF EXISTS check_container_within_max_tier() CASCADE;
