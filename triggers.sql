@@ -215,11 +215,13 @@ CREATE TABLE Container (
 1. Dynamic Maximum Tier Constraint:
    The `tier_number` of a container in `Position` cannot exceed `YardType.max_tier_number` for that yard.
    - Reason: Standard SQL `CHECK` constraints cannot execute subqueries across tables.
+   - Now enforced by Trigger 3 below.
 
 2. Sequential Gravity Stacking Rule:
    A container cannot occupy tier N (where N > 1) in a (yard_code, bay_number, row_number) slot unless 
    a container already occupies tier N - 1 at the same bay and row.
    - Reason: Requires procedural validation / cross-row state checking.
+   - Now enforced by Trigger 4 below.
 
 3. Complete ISO 6346 Check Digit Validation:
    Verifying the full 11-character ISO 6346 checksum formula requires procedural algorithm logic.
@@ -290,10 +292,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Only INSERT and UPDATE on Container can place a container above the maximum
--- tier; a DELETE can never introduce a violation, so DELETE is not covered.
+-- Only INSERT and UPDATE on Container, or UPDATE on Yard and YardType, can place a container
+-- above the maximum tier; a DELETE can never introduce a violation, so DELETE is not covered.
 CREATE CONSTRAINT TRIGGER container_within_max_tier
     AFTER INSERT OR UPDATE ON Container
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION check_container_within_max_tier();
+
+CREATE CONSTRAINT TRIGGER yard_type_within_max_tier
+    AFTER UPDATE ON YardType
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION check_container_within_max_tier();
+
+CREATE CONSTRAINT TRIGGER yard_within_max_tier
+    AFTER UPDATE ON Yard
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
     EXECUTE FUNCTION check_container_within_max_tier();
@@ -304,15 +318,14 @@ BEGIN
 	IF EXISTS(
 		SELECT 1 FROM container c
 			WHERE c.mmsi IS NULL
-			GROUP BY c.row_number
+			GROUP BY c.yard_code, c.bay_number, c.row_number
 			-- Property 1: There must not be any duplicates.
 			HAVING COUNT(*) <> COUNT(DISTINCT c.tier_number)
 			-- Property 2: The maximum tier number must equal to the number of containers in the row.
 			OR COUNT(*) <> MAX(c.tier_number)
 			-- Property 1 and 2 guarantee that the tier number ranges from 1, 2, 3, ..., N.
     ) THEN
-        RAISE EXCEPTION 'A container in a yard is either on the group or on top of another container; there are no
-		floating containers';
+        RAISE EXCEPTION 'A container in a yard is either on the ground or on top of another container; there are no floating containers';
     END IF;
     RETURN NULL;
 END;

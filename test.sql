@@ -12,6 +12,8 @@
 
 SET client_min_messages TO NOTICE;
 
+BEGIN;
+
 CREATE FUNCTION pg_temp.expect(label TEXT, should_succeed BOOLEAN, stmts TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -128,6 +130,51 @@ $sql$);
 DO $$
 BEGIN
 	RAISE NOTICE '========== END TESTING TRIGGER 2 ==========';
+END $$;
+
+--------------------------------------------------------------------------------
+-- TEST: Trigger 3
+-- A container in a yard cannot be stacked higher than the maximum tier of that yard.
+-- Yard Y is "Simple" (max tier 3); ADIU0000012 sits at tier 2.
+--------------------------------------------------------------------------------
+
+DO $$
+BEGIN
+	RAISE NOTICE '========== TESTING TRIGGER 3 ==========';
+END $$;
+
+SELECT pg_temp.expect('T3.1 stack container up to the max tier', TRUE, $sql$
+    INSERT INTO Container (ISO6346, description, company_code, yard_code, bay_number, row_number, tier_number)
+    VALUES ('ADIU0000002', '-', 'ADI', 'Y', 0, 0, 3);
+$sql$);
+
+SELECT pg_temp.expect('T3.2 stack container above the max tier', FALSE, $sql$
+    INSERT INTO Position VALUES ('Y', 0, 0, 4);
+    INSERT INTO Container (ISO6346, description, company_code, yard_code, bay_number, row_number, tier_number)
+    VALUES ('ADIU0000002', '-', 'ADI', 'Y', 0, 0, 3), ('ADIU0000003', '-', 'ADI', 'Y', 0, 0, 4);
+$sql$);
+
+SELECT pg_temp.expect('T3.3 lower max tier below an occupied tier', FALSE, $sql$
+    UPDATE YardType SET max_tier_number = 1 WHERE type = 'Simple';
+$sql$);
+
+SELECT pg_temp.expect('T3.4 lower max tier to the highest occupied tier', TRUE, $sql$
+    UPDATE YardType SET max_tier_number = 2 WHERE type = 'Simple';
+$sql$);
+
+SELECT pg_temp.expect('T3.5 change yard to a type with a lower max tier', FALSE, $sql$
+    INSERT INTO YardType VALUES ('Tiny', 1);
+    UPDATE Yard SET type = 'Tiny' WHERE yard_code = 'Y';
+$sql$);
+
+SELECT pg_temp.expect('T3.6 change yard to a type with a higher max tier', TRUE, $sql$
+    INSERT INTO YardType VALUES ('Tall', 9);
+    UPDATE Yard SET type = 'Tall' WHERE yard_code = 'Y';
+$sql$);
+
+DO $$
+BEGIN
+	RAISE NOTICE '========== END TESTING TRIGGER 3 ==========';
 END $$;
 
 --------------------------------------------------------------------------------
@@ -255,6 +302,11 @@ $sql$);
 SELECT pg_temp.expect('T4.20 delete bottom position (cascades to its container)', FALSE, $sql$
     DELETE FROM Position
     WHERE yard_code = 'Y' AND bay_number = 0 AND row_number = 0 AND tier_number = 1;
+$sql$);
+
+SELECT pg_temp.expect('T4.21 insert ground container in another bay with the same row number', TRUE, $sql$
+    INSERT INTO Container (ISO6346, description, company_code, yard_code, bay_number, row_number, tier_number)
+    VALUES ('ADIU0000002', '-', 'ADI', 'Y', 1, 0, 1);
 $sql$);
 
 DO $$
