@@ -232,48 +232,8 @@ CREATE TABLE Container (
 --------------------------------------------------------------------------------
 
 -- Trigger 1: There is no container that is neither on a ship nor in a yard.
--- Trigger will not fire as there is already a CHECK condition in Container table
-CREATE FUNCTION check_container_has_location()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM Container c
-        WHERE (c.yard_code IS NULL AND c.mmsi IS NULL)
-    ) THEN
-        RAISE EXCEPTION 'A container cannot be neither on a ship nor in a yard';
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER container_has_location
-    AFTER INSERT OR UPDATE ON Container
-    DEFERRABLE INITIALLY DEFERRED
-    FOR EACH ROW
-EXECUTE FUNCTION check_container_has_location();
-
 -- Trigger 2: A container must either be on a ship or in a yard (but not both).
-CREATE FUNCTION check_container_not_both_ship_and_yard() RETURNS TRIGGER AS $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM Container c
-        WHERE c.mmsi IS NOT NULL
-          AND (c.yard_code IS NOT NULL OR c.bay_number IS NOT NULL
-               OR c.row_number IS NOT NULL OR c.tier_number IS NOT NULL)
-    ) THEN
-        RAISE EXCEPTION 'A container must either be on a ship or in a yard (but not both)';
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER container_not_both_ship_and_yard
-    AFTER INSERT OR UPDATE ON Container
-    DEFERRABLE INITIALLY DEFERRED
-    FOR EACH ROW
-    EXECUTE FUNCTION check_container_not_both_ship_and_yard();
+-- Both are already enforced by the CHECK constraint on Container, so no triggers are needed.
 
 -- Trigger 3: A container in a yard cannot be stacked higher than the maximum tier of that yard.
 CREATE FUNCTION check_container_within_max_tier() RETURNS TRIGGER AS $$
